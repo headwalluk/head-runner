@@ -128,6 +128,7 @@ works, e.g. `headrun show fancy`.
 
 - [Jobsheets](docs/jobsheets.md): frontmatter reference, responses and outcomes
 - [Engines](docs/engines.md): built-in engines, permission modes, writing your own adapter
+- [Configuration](docs/configuration.md): every config setting, engine binaries, environment variables
 - [Operations](docs/operations.md): dedicated account, systemd, monitoring and upgrades
 - [Security](docs/security.md): the risks of unattended agents and how to manage them
 - [Configuration](share/config.sample): every setting, with defaults

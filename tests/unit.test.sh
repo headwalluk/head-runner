@@ -79,3 +79,19 @@ test_config_accepts_engine_bins_and_null_default() {
   assert_equals "mytool" "$(config_engine_bin my-tool)"
   assert_equals "opencode" "$(config_engine_bin opencode)"
 }
+
+test_every_config_key_is_documented() {
+  local -a CONFIG_KEYS=()
+  local CONFIG_KEY
+  while IFS= read -r CONFIG_KEY; do
+    CONFIG_KEYS+=("${CONFIG_KEY}")
+  done < <(sed -n 's/^ *\([A-Z][A-Z_]*\)) CFG_.*/\1/p' "${REPOSITORY_ROOT}/lib/config.sh")
+  (( ${#CONFIG_KEYS[@]} >= 10 )) || fail "found only ${#CONFIG_KEYS[@]} config keys in lib/config.sh"
+  local CONFIGURATION_DOC SAMPLE_CONFIG
+  CONFIGURATION_DOC="$(< "${REPOSITORY_ROOT}/docs/configuration.md")"
+  SAMPLE_CONFIG="$(< "${REPOSITORY_ROOT}/share/config.sample")"
+  for CONFIG_KEY in "${CONFIG_KEYS[@]}"; do
+    assert_contains "${CONFIGURATION_DOC}" "| \`${CONFIG_KEY}\` |"
+    assert_contains "${SAMPLE_CONFIG}" "${CONFIG_KEY}="
+  done
+}

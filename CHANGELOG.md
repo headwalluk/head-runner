@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-10-13
+
+### Documentation
+
+- New `docs/configuration.md`, the full configuration reference:
+  - every config setting with its default and allowed values
+  - engine binaries (`<NAME>_BIN`), including the `node`-on-`PATH` caveat for nvm-installed
+    CLIs such as Gemini
+  - environment variables
+  - override files in the config directory
+- A test fails if any config key is missing from `docs/configuration.md` or
+  `share/config.sample`.
+
 ## [1.0.0] - 2026-10-13
 
 First stable release. From here on, the jobsheet format, CLI commands and options, config
