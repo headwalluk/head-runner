@@ -83,7 +83,7 @@ See [`examples/`](examples/) for complete jobsheets.
 
 | Command | What it does |
 |---|---|
-| `headrun add FILE` / `add -` | Queue a jobsheet from a file or stdin (`ssh box headrun add - < job.md`) |
+| `headrun add FILE` / `add -` | Queue a jobsheet from a file or stdin (`ssh box .local/bin/headrun add - < job.md`) |
 | `headrun new` | Write a jobsheet in `$EDITOR` from a template, then queue it |
 | `headrun ls [--all] [--state S]` | Running and pending jobs, plus recent finished ones |
 | `headrun show [ID] [--request\|--prompt\|--log\|--meta\|--path]` | A job's response (default: running or latest job) |

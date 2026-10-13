@@ -54,10 +54,13 @@ Things `headrun` deliberately leaves to the host:
 Queue jobs from your own machine over SSH:
 
 ```bash
-ssh headrun@box headrun add - < job.md
-ssh headrun@box headrun ls
-ssh headrun@box headrun show fancy
+ssh headrun@box .local/bin/headrun add - < job.md
+ssh headrun@box .local/bin/headrun ls
+ssh headrun@box .local/bin/headrun show fancy
 ```
+
+A command run over SSH gets a non-login shell, which usually doesn't have `~/.local/bin`
+on `PATH`. That's why these use the path relative to the account's home.
 
 ## Running the runner
 

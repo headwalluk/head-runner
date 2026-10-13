@@ -45,6 +45,10 @@ Nobody is present to approve actions, so most real work needs `bypass`. Read
 In those modes the agent can't write `response.md` (it sits outside the working
 directory), so the runner tells it to make its final message the response instead.
 
+The jobsheet's `dirs:` are passed to `claude` and `codex` as `--add-dir`. OpenCode has no
+equivalent flag, so in modes other than `bypass` it refuses to read outside `workdir`.
+Allow those paths in `opencode.json`, or use `bypass`.
+
 ## `shell` engine
 
 The `shell` engine turns any Unix filter into a job:
