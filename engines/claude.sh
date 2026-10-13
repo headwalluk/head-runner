@@ -12,7 +12,7 @@ case "${ADAPTER_ACTION}" in
       printf '%s not found (set CLAUDE_BIN in the config)\n' "${CLAUDE_COMMAND}"
       exit 1
     fi
-    printf '%s\n' "$("${CLAUDE_COMMAND}" --version 2>&1 | head -n 1)"
+    printf '%s\n' "$("${CLAUDE_COMMAND}" --version 2>&1 | sed -n 1p)"
     exit 0
     ;;
   run) ;;

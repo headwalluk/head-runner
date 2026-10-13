@@ -9,10 +9,10 @@ ACTIVE_JOB_PROCESS_ID=""
 ACTIVE_JOB_STOP_REASON=""
 CLAIMED_JOB_ID=""
 
-# Acquires the runner lock without waiting; dies if another runner holds it.
+# Acquires the runner lock (briefly waiting out status probes); dies if another runner holds it.
 runner_acquire_lock() {
   exec {RUNNER_LOCK_FD}>>"${RUNNER_LOCK_FILE}"
-  if ! flock --nonblock "${RUNNER_LOCK_FD}"; then
+  if ! flock --wait 2 "${RUNNER_LOCK_FD}"; then
     local OTHER_RUNNER_ID=""
     if [[ -f "${RUNNER_PID_FILE}" ]]; then
       OTHER_RUNNER_ID="$(< "${RUNNER_PID_FILE}")"
@@ -38,14 +38,20 @@ runner_is_active() {
   return "${RUNNER_ACTIVE}"
 }
 
-# Handles INT/TERM/HUP: stops the active job (escalating to SIGKILL on repeat) and ends the run loop.
+# Handles INT/TERM/HUP: stops the active job (escalating to SIGKILL on repeat); exits at once only when no job is claimed.
 runner_on_signal() {
   local SIGNAL_NAME="$1"
   RUNNER_SIGNAL_COUNT=$(( RUNNER_SIGNAL_COUNT + 1 ))
   RUNNER_STOP_REQUESTED=1
+  if [[ -z "${CLAIMED_JOB_ID}" ]]; then
+    log_info "received SIG${SIGNAL_NAME}: runner exiting"
+    exit 0
+  fi
+  if [[ -z "${ACTIVE_JOB_STOP_REASON}" ]]; then
+    ACTIVE_JOB_STOP_REASON="stopped by SIG${SIGNAL_NAME}"
+  fi
   if [[ -n "${ACTIVE_JOB_PROCESS_ID}" ]] && process_is_alive "${ACTIVE_JOB_PROCESS_ID}"; then
     if (( RUNNER_SIGNAL_COUNT == 1 )); then
-      ACTIVE_JOB_STOP_REASON="stopped by SIG${SIGNAL_NAME}"
       log_warn "received SIG${SIGNAL_NAME}: stopping job ${CLAIMED_JOB_ID} (send again to force)"
       kill -TERM -- "-${ACTIVE_JOB_PROCESS_ID}" 2>/dev/null || log_warn "job process group ${ACTIVE_JOB_PROCESS_ID} already gone"
     else
@@ -53,8 +59,7 @@ runner_on_signal() {
       kill -KILL -- "-${ACTIVE_JOB_PROCESS_ID}" 2>/dev/null || log_warn "job process group ${ACTIVE_JOB_PROCESS_ID} already gone"
     fi
   else
-    log_info "received SIG${SIGNAL_NAME}: runner exiting"
-    exit 130
+    log_warn "received SIG${SIGNAL_NAME}: runner will exit once job ${CLAIMED_JOB_ID} is recorded"
   fi
 }
 
@@ -65,17 +70,48 @@ runner_cleanup() {
   fi
 }
 
+# Sleeps without holding the runner lock in the child, waking early for signal traps.
+runner_sleep() {
+  local SLEEP_SECONDS="$1"
+  sleep "${SLEEP_SECONDS}" {RUNNER_LOCK_FD}>&- &
+  local SLEEP_PROCESS_ID=$!
+  local SLEEP_STATUS=0
+  wait "${SLEEP_PROCESS_ID}" || SLEEP_STATUS=$?
+  if (( SLEEP_STATUS > 128 )) && process_is_alive "${SLEEP_PROCESS_ID}"; then
+    kill "${SLEEP_PROCESS_ID}" 2>/dev/null || log_debug "sleep process ${SLEEP_PROCESS_ID} already gone"
+  fi
+}
+
+# Returns 0 if any process remains in the given process group.
+process_group_is_alive() {
+  local PROCESS_GROUP_ID="$1"
+  [[ -n "${PROCESS_GROUP_ID}" && "${PROCESS_GROUP_ID}" =~ ^[0-9]+$ ]] && kill -0 -- "-${PROCESS_GROUP_ID}" 2>/dev/null
+}
+
+# Terminates whatever is left of a job's process group: SIGTERM, then SIGKILL after KILL_GRACE.
+runner_reap_process_group() {
+  local PROCESS_GROUP_ID="$1"
+  local JOB_LABEL="$2"
+  if process_group_is_alive "${PROCESS_GROUP_ID}"; then
+    log_warn "job ${JOB_LABEL}: processes remain in group ${PROCESS_GROUP_ID}; sending SIGTERM"
+    kill -TERM -- "-${PROCESS_GROUP_ID}" 2>/dev/null || log_debug "process group ${PROCESS_GROUP_ID} exited before SIGTERM"
+    local GRACE_DEADLINE=$(( SECONDS + KILL_GRACE_SECONDS ))
+    while process_group_is_alive "${PROCESS_GROUP_ID}" && (( SECONDS < GRACE_DEADLINE )); do
+      sleep 0.2
+    done
+    if process_group_is_alive "${PROCESS_GROUP_ID}"; then
+      log_warn "job ${JOB_LABEL}: group ${PROCESS_GROUP_ID} ignored SIGTERM for $(seconds_to_human "${KILL_GRACE_SECONDS}"); sending SIGKILL"
+      kill -KILL -- "-${PROCESS_GROUP_ID}" 2>/dev/null || log_debug "process group ${PROCESS_GROUP_ID} exited before SIGKILL"
+    fi
+  fi
+}
+
 # Moves jobs left in running/ by a dead runner to failed/, killing any surviving engine process group.
 runner_recover_orphans() {
   local STATE_NAME JOB_ID
   while IFS=$'\t' read -r STATE_NAME JOB_ID; do
     local JOB_DIR="${JOBS_ROOT}/running/${JOB_ID}"
-    local ORPHAN_PROCESS_ID
-    ORPHAN_PROCESS_ID="$(meta_get "${JOB_DIR}" pid)"
-    if process_is_alive "${ORPHAN_PROCESS_ID}"; then
-      log_warn "orphaned job ${JOB_ID}: engine process group ${ORPHAN_PROCESS_ID} still alive, terminating"
-      kill -TERM -- "-${ORPHAN_PROCESS_ID}" 2>/dev/null || log_warn "could not signal process group ${ORPHAN_PROCESS_ID}"
-    fi
+    runner_reap_process_group "$(meta_get "${JOB_DIR}" pid)" "${JOB_ID}"
     log_warn "orphaned job ${JOB_ID}: its runner exited without finishing it; marking as failed"
     runner_finalise_job "${JOB_DIR}" failed "orphaned: the runner exited while the job was running" ""
   done < <(queue_list_jobs running)
@@ -83,13 +119,15 @@ runner_recover_orphans() {
 
 # Moves the next pending job to running/ and sets CLAIMED_JOB_ID (empty if the queue is empty); call under the queue lock.
 runner_claim_next_locked() {
-  CLAIMED_JOB_ID="$(queue_pending_in_order | head -n 1)"
+  local PENDING_ORDER
+  PENDING_ORDER="$(queue_pending_in_order)"
+  CLAIMED_JOB_ID="${PENDING_ORDER%%$'\n'*}"
   if [[ -n "${CLAIMED_JOB_ID}" ]]; then
     mv "${JOBS_ROOT}/pending/${CLAIMED_JOB_ID}" "${JOBS_ROOT}/running/${CLAIMED_JOB_ID}"
   fi
 }
 
-# Moves a job directory from running/ to its final state; call under the queue lock.
+# Moves a job directory from running/ to another state; call under the queue lock.
 runner_move_job_locked() {
   local JOB_ID="$1"
   local FINAL_STATE="$2"
@@ -193,8 +231,7 @@ runner_finalise_job() {
   meta_set "${JOB_DIR}" outcome "${RESPONSE_OUTCOME:-unknown}"
   meta_set "${JOB_DIR}" reason "${FAILURE_REASON}"
 
-  local RESPONSE_BODY_FILE="${RESPONSE_FILE}.body.$$"
-  mv "${RESPONSE_FILE}" "${RESPONSE_BODY_FILE}"
+  local FINAL_RESPONSE_FILE="${RESPONSE_FILE}.final.$$"
   {
     printf -- '---\n'
     printf 'job: %s\n' "${JOB_ID}"
@@ -218,9 +255,9 @@ runner_finalise_job() {
     printf 'duration: %s\n' "$(seconds_to_human $(( FINISHED_EPOCH - STARTED_EPOCH )))"
     printf 'exit_code: %s\n' "${EXIT_CODE:-none}"
     printf -- '---\n\n'
-    cat "${RESPONSE_BODY_FILE}"
-  } > "${RESPONSE_FILE}"
-  rm -f "${RESPONSE_BODY_FILE}"
+    cat "${RESPONSE_FILE}"
+  } > "${FINAL_RESPONSE_FILE}"
+  mv -f "${FINAL_RESPONSE_FILE}" "${RESPONSE_FILE}"
 
   with_queue_lock runner_move_job_locked "${JOB_ID}" "${FINAL_STATE}"
 
@@ -255,7 +292,7 @@ runner_run_job() {
 
   meta_set "${JOB_DIR}" started_at "$(now_epoch)"
   meta_set "${JOB_DIR}" runner_pid "$$"
-  meta_set "${JOB_DIR}" host "$(hostname 2>/dev/null || printf 'unknown')"
+  meta_set "${JOB_DIR}" host "${HOST_NAME}"
   log_info "job ${JOB_ID}: started ($(meta_get "${JOB_DIR}" title))"
 
   jobsheet_validate "${REQUEST_FILE}" run
@@ -286,7 +323,10 @@ runner_run_job() {
   local EXTRA_DIRECTORIES="${JOB_FIELDS[dirs]:-}"
 
   if [[ ! -d "${WORKDIR_PATH}" ]]; then
-    mkdir -p "${WORKDIR_PATH}"
+    if ! mkdir -p -- "${WORKDIR_PATH}" 2>> "${JOB_DIR}/transcript.log"; then
+      runner_finalise_job "${JOB_DIR}" failed "could not create workdir ${WORKDIR_PATH}" ""
+      return 0
+    fi
     log_info "job ${JOB_ID}: created workdir ${WORKDIR_PATH}"
   fi
 
@@ -323,7 +363,12 @@ runner_run_job() {
 
   log_info "job ${JOB_ID}: engine ${ENGINE_NAME}${JOB_FIELDS[model]:+ (${JOB_FIELDS[model]})}, timeout $(seconds_to_human "${TIMEOUT_SECONDS}"), workdir ${WORKDIR_PATH}"
 
-  ACTIVE_JOB_STOP_REASON=""
+  if (( RUNNER_STOP_REQUESTED == 1 )); then
+    log_info "job ${JOB_ID}: stop requested before the engine started; returning it to pending"
+    with_queue_lock runner_move_job_locked "${JOB_ID}" pending
+    return 0
+  fi
+
   (
     cd "${WORKDIR_PATH}"
     exec env "${ADAPTER_ENVIRONMENT[@]}" setsid timeout --signal=TERM --kill-after="${KILL_GRACE_SECONDS}" "${TIMEOUT_SECONDS}" bash "${ADAPTER_PATH}" run
@@ -333,7 +378,7 @@ runner_run_job() {
 
   local TAIL_PROCESS_ID=""
   if (( RUNNER_STREAM_OUTPUT == 1 )); then
-    tail -n +1 -f --pid="${ACTIVE_JOB_PROCESS_ID}" "${JOB_DIR}/transcript.log" &
+    tail -n +1 -f --pid="${ACTIVE_JOB_PROCESS_ID}" "${JOB_DIR}/transcript.log" {RUNNER_LOCK_FD}>&- &
     TAIL_PROCESS_ID=$!
   fi
 
@@ -344,6 +389,7 @@ runner_run_job() {
   done
   JOB_EXIT_CODE=0
   wait "${ACTIVE_JOB_PROCESS_ID}" || JOB_EXIT_CODE=$?
+  runner_reap_process_group "${ACTIVE_JOB_PROCESS_ID}" "${JOB_ID}"
   ACTIVE_JOB_PROCESS_ID=""
 
   if [[ -n "${TAIL_PROCESS_ID}" ]]; then
@@ -407,7 +453,7 @@ runner_main() {
         log_info "queue is paused; waiting for headrun resume"
         IDLE_NOTICE_SHOWN=1
       fi
-      interruptible_sleep "${POLL_INTERVAL_SECONDS}"
+      runner_sleep "${POLL_INTERVAL_SECONDS}"
       continue
     fi
 
@@ -421,7 +467,7 @@ runner_main() {
         log_info "queue is empty; watching for new jobs"
         IDLE_NOTICE_SHOWN=2
       fi
-      interruptible_sleep "${POLL_INTERVAL_SECONDS}"
+      runner_sleep "${POLL_INTERVAL_SECONDS}"
       continue
     fi
 
@@ -437,4 +483,13 @@ runner_main() {
   if (( RUNNER_STOP_REQUESTED == 1 )); then
     log_info "runner stopped by signal after ${JOBS_RUN} job(s)"
   fi
+}
+
+# Prints the pid recorded by the active runner, or "?" while it is still starting.
+runner_recorded_pid() {
+  local RECORDED_PID="?"
+  if [[ -s "${RUNNER_PID_FILE}" ]]; then
+    RECORDED_PID="$(< "${RUNNER_PID_FILE}")"
+  fi
+  printf '%s' "${RECORDED_PID}"
 }

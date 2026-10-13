@@ -12,7 +12,7 @@ case "${ADAPTER_ACTION}" in
       printf '%s not found (set OPENCODE_BIN in the config)\n' "${OPENCODE_COMMAND}"
       exit 1
     fi
-    printf 'opencode %s\n' "$("${OPENCODE_COMMAND}" --version 2>&1 | head -n 1)"
+    printf 'opencode %s\n' "$("${OPENCODE_COMMAND}" --version 2>&1 | sed -n 1p)"
     exit 0
     ;;
   run) ;;
@@ -58,7 +58,7 @@ OPENCODE_STATUS="${PIPELINE_STATUSES[0]}"
 
 # "opencode run" can exit before flushing its last JSON events, so the session export is the reliable record.
 if command -v jq > /dev/null && [[ -s "${STREAM_FILE}" ]]; then
-  SESSION_ID="$(jq -R -r 'try fromjson catch empty | .sessionID // empty' "${STREAM_FILE}" | head -n 1)"
+  SESSION_ID="$(jq -R -r -n 'first(inputs | try fromjson catch empty | .sessionID // empty)' "${STREAM_FILE}")"
   EXPORT_FILE="${HEADRUN_JOB_DIR}/opencode-session.json"
   if [[ -n "${SESSION_ID}" ]]; then
     printf 'session_id=%s\n' "${SESSION_ID}" >> "${HEADRUN_ENGINE_META}"

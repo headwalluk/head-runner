@@ -11,6 +11,7 @@ set -o errexit -o nounset -o pipefail
 
 REPOSITORY_SLUG="headwalluk/head-runner"
 INSTALL_WORK_DIRECTORY=""
+INSTALL_STAGING_DIRECTORY=""
 
 # Prints an installer message.
 say() {
@@ -35,11 +36,23 @@ download() {
   fi
 }
 
-# Prints the latest release tag, or nothing if there are no releases.
+# Prints the latest release tag, or nothing (with a note on stderr) if it cannot be determined.
 latest_release_tag() {
   local RELEASE_JSON=""
-  if RELEASE_JSON="$(download "https://api.github.com/repos/${REPOSITORY_SLUG}/releases/latest" 2>/dev/null)"; then
-    printf '%s' "${RELEASE_JSON}" | sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1
+  if ! RELEASE_JSON="$(download "https://api.github.com/repos/${REPOSITORY_SLUG}/releases/latest" 2>/dev/null)"; then
+    say "could not look up the latest release (no releases yet, or the GitHub API is unavailable)" >&2
+  else
+    printf '%s' "${RELEASE_JSON}" | sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | sed -n 1p
+  fi
+}
+
+# Removes the download and any half-built staging directory.
+cleanup_install() {
+  if [[ -n "${INSTALL_WORK_DIRECTORY}" ]]; then
+    rm -rf -- "${INSTALL_WORK_DIRECTORY}"
+  fi
+  if [[ -n "${INSTALL_STAGING_DIRECTORY}" ]]; then
+    rm -rf -- "${INSTALL_STAGING_DIRECTORY}"
   fi
 }
 
@@ -104,7 +117,7 @@ main() {
   check_requirements
 
   INSTALL_WORK_DIRECTORY="$(mktemp -d "${TMPDIR:-/tmp}/headrun-install.XXXXXX")"
-  trap 'rm -rf -- "${INSTALL_WORK_DIRECTORY}"' EXIT
+  trap cleanup_install EXIT
 
   local SOURCE_DIRECTORY=""
   local SOURCE_LABEL=""
@@ -117,7 +130,8 @@ main() {
       REQUESTED_REF="$(latest_release_tag)"
     fi
     if [[ -z "${REQUESTED_REF}" ]]; then
-      REQUESTED_REF="main"
+      say "installing the main branch"
+    REQUESTED_REF="main"
     fi
     SOURCE_LABEL="${REPOSITORY_SLUG}@${REQUESTED_REF}"
     say "downloading ${SOURCE_LABEL}"
@@ -133,6 +147,7 @@ main() {
   fi
 
   local STAGING_DIRECTORY="${APP_DIRECTORY}.new.$$"
+  INSTALL_STAGING_DIRECTORY="${STAGING_DIRECTORY}"
   mkdir -p "$(dirname "${APP_DIRECTORY}")" "${BIN_DIRECTORY}"
   chmod 700 "$(dirname "${APP_DIRECTORY}")"
   mkdir "${STAGING_DIRECTORY}"
@@ -149,6 +164,7 @@ main() {
     mv "${APP_DIRECTORY}" "${APP_DIRECTORY}.old.$$"
   fi
   mv "${STAGING_DIRECTORY}" "${APP_DIRECTORY}"
+  INSTALL_STAGING_DIRECTORY=""
   rm -rf -- "${APP_DIRECTORY}.old.$$"
   ln -sfn "${APP_DIRECTORY}/bin/headrun" "${LINK_PATH}"
 

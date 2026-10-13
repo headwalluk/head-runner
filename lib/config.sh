@@ -16,6 +16,7 @@ HEADRUN_LOG_PATH=""
 
 # Environment-derived values
 USER_HOME=""
+HOST_NAME=""
 EDITOR_COMMAND=""
 CURRENT_SEARCH_PATH=""
 COLOUR_ALLOWED=1
@@ -66,6 +67,7 @@ config_read_environment() {
   fi
 
   EDITOR_COMMAND="${VISUAL:-${EDITOR:-vi}}"
+  HOST_NAME="${HOSTNAME:-unknown}"
   CURRENT_SEARCH_PATH="${PATH:-/usr/local/bin:/usr/bin:/bin}"
   if [[ -n "${NO_COLOR:-}" ]]; then
     COLOUR_ALLOWED=0
@@ -152,8 +154,8 @@ config_load() {
   if ! POLL_INTERVAL_SECONDS="$(duration_to_seconds "${CFG_POLL_INTERVAL}")" || (( POLL_INTERVAL_SECONDS == 0 )); then
     CONFIG_ERRORS+=("POLL_INTERVAL must be a positive duration such as 5s: ${CFG_POLL_INTERVAL}")
   fi
-  if ! KILL_GRACE_SECONDS="$(duration_to_seconds "${CFG_KILL_GRACE}")"; then
-    CONFIG_ERRORS+=("KILL_GRACE must be a duration such as 30s: ${CFG_KILL_GRACE}")
+  if ! KILL_GRACE_SECONDS="$(duration_to_seconds "${CFG_KILL_GRACE}")" || (( KILL_GRACE_SECONDS == 0 )); then
+    CONFIG_ERRORS+=("KILL_GRACE must be a positive duration such as 30s: ${CFG_KILL_GRACE}")
   fi
   if ! PRUNE_AFTER_SECONDS="$(duration_to_seconds "${CFG_PRUNE_AFTER}")"; then
     CONFIG_ERRORS+=("PRUNE_AFTER must be a duration such as 30d: ${CFG_PRUNE_AFTER}")

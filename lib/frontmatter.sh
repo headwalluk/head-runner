@@ -82,9 +82,14 @@ frontmatter_set() {
   local FIELD_KEY="$2"
   local FIELD_VALUE="$3"
   local TEMPORARY_FILE="${JOBSHEET_FILE}.tmp.$$"
+  if [[ "${FIELD_VALUE}" == *[[:space:]]#* || "${FIELD_VALUE}" == [\"\']* || "${FIELD_VALUE}" != "$(trim "${FIELD_VALUE}")" ]]; then
+    FIELD_VALUE="\"${FIELD_VALUE}\""
+  fi
 
   if frontmatter_present "${JOBSHEET_FILE}"; then
-    awk -v field_key="${FIELD_KEY}" -v field_value="${FIELD_VALUE}" '
+    # Values travel through ENVIRON because awk -v would interpret backslash escapes.
+    HEADRUN_FIELD_KEY="${FIELD_KEY}" HEADRUN_FIELD_VALUE="${FIELD_VALUE}" awk '
+      BEGIN { field_key = ENVIRON["HEADRUN_FIELD_KEY"]; field_value = ENVIRON["HEADRUN_FIELD_VALUE"] }
       function normalise(text) { text = tolower(text); gsub(/-/, "_", text); return text }
       NR == 1 { in_block = 1; print; next }
       in_block && /^(---|\.\.\.)[ \t\r]*$/ {
@@ -114,5 +119,15 @@ frontmatter_set() {
 # Prints the first Markdown heading in the body, without the leading hashes.
 frontmatter_first_heading() {
   local JOBSHEET_FILE="$1"
-  frontmatter_body "${JOBSHEET_FILE}" | awk '/^#+[ \t]+/ { sub(/^#+[ \t]+/, ""); sub(/[ \t\r]+$/, ""); print; exit }'
+  frontmatter_body "${JOBSHEET_FILE}" | awk '!found && /^#+[ \t]+/ { sub(/^#+[ \t]+/, ""); sub(/[ \t\r]+$/, ""); print; found = 1 }'
+}
+
+# Prints the value of one frontmatter key (tabs in the value preserved), or nothing.
+frontmatter_value() {
+  local JOBSHEET_FILE="$1"
+  local FIELD_KEY="$2"
+  frontmatter_read "${JOBSHEET_FILE}" | awk -v field_key="${FIELD_KEY}" '
+    { tab_position = index($0, "\t") }
+    !found && substr($0, 1, tab_position - 1) == field_key { print substr($0, tab_position + 1); found = 1 }
+  '
 }

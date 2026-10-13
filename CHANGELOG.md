@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-10-13
+
+### Fixed
+
+- Runner no longer dies (SIGPIPE under `pipefail`) when claiming from a large queue; other
+  early-exit pipelines removed for the same reason.
+- Processes a job leaves behind (e.g. ones ignoring SIGTERM) are now terminated after
+  timeout, `stop --now` and orphan recovery: SIGTERM, then SIGKILL after `KILL_GRACE`.
+- Background helpers (`tail`, `sleep`) no longer inherit the runner lock, so a killed
+  runner no longer blocks a new one until the orphaned job ends.
+- A signal arriving between claiming and finishing a job no longer abandons it in
+  `running/`; a job stopped before its engine starts returns to `pending/`. Response
+  finalisation is atomic.
+- An idle runner exits 0 on SIGTERM/SIGINT (clean `systemctl stop`).
+- A `workdir` that cannot be created, or exists as a file, fails that job instead of the
+  runner.
+- Option values containing `#`, backslashes or leading quotes are stored intact; tabs and
+  line breaks are rejected.
+- `$EDITOR`/`$VISUAL` commands with quoted arguments (e.g. `emacsclient -t -a ""`) work.
+- `KILL_GRACE=0` is rejected (it would disable the SIGKILL escalation).
+- A runner start no longer fails if a `status` probe holds the lock at that instant.
+- Installer: explains when it falls back to `main`, and cleans up a failed staging copy.
+
+### Changed
+
+- `--help` is handled once for every subcommand.
+
 ## [0.5.0] - 2026-10-13
 
 ### Added

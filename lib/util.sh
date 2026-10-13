@@ -118,15 +118,3 @@ process_is_alive() {
   local PROCESS_ID="$1"
   [[ -n "${PROCESS_ID}" && "${PROCESS_ID}" =~ ^[0-9]+$ ]] && kill -0 "${PROCESS_ID}" 2>/dev/null
 }
-
-# Sleeps in the background and waits, so signal traps fire without waiting for sleep to finish.
-interruptible_sleep() {
-  local SLEEP_SECONDS="$1"
-  sleep "${SLEEP_SECONDS}" &
-  local SLEEP_PROCESS_ID=$!
-  local SLEEP_STATUS=0
-  wait "${SLEEP_PROCESS_ID}" || SLEEP_STATUS=$?
-  if (( SLEEP_STATUS > 128 )) && process_is_alive "${SLEEP_PROCESS_ID}"; then
-    kill "${SLEEP_PROCESS_ID}" 2>/dev/null || log_debug "sleep process ${SLEEP_PROCESS_ID} already gone"
-  fi
-}

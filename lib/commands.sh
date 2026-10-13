@@ -73,9 +73,8 @@ draft_create() {
 # Opens a file in the configured editor.
 open_in_editor() {
   local EDIT_TARGET="$1"
-  local -a EDITOR_WORDS=()
-  read -ra EDITOR_WORDS <<< "${EDITOR_COMMAND}"
-  "${EDITOR_WORDS[@]}" "${EDIT_TARGET}" < /dev/tty > /dev/tty
+  # A shell parses the editor command so quoted arguments work, e.g. VISUAL='emacsclient -t -a ""'.
+  sh -c "${EDITOR_COMMAND} \"\$1\"" headrun-editor "${EDIT_TARGET}" < /dev/tty > /dev/tty
 }
 
 # Opens the draft in the editor until it validates, or the operator aborts.
@@ -128,6 +127,9 @@ parse_override_option() {
   if [[ -z "${OPTION_VALUE}" ]]; then
     die "${OPTION_NAME} needs a value"
   fi
+  if [[ "${OPTION_VALUE}" == *[$'\t\n\r']* ]]; then
+    die "${OPTION_NAME} value must not contain tabs or line breaks"
+  fi
   if [[ "${OVERRIDE_KEY}" == "workdir" && "${OPTION_VALUE}" != /* ]]; then
     OPTION_VALUE="$(readlink -m "${OPTION_VALUE}")"
   fi
@@ -162,7 +164,6 @@ cmd_add() {
     case "$1" in
       --check) CHECK_ONLY=1; shift ;;
       -) SOURCE_PATH="-"; shift ;;
-      -h|--help) cmd_help; return 0 ;;
       -*) parse_override_option OPTION_OVERRIDES "$1" "${2:-}"; shift 2 ;;
       *)
         if [[ -n "${SOURCE_PATH}" ]]; then
@@ -211,7 +212,6 @@ cmd_new() {
   local -A OPTION_OVERRIDES=()
   while (( $# > 0 )); do
     case "$1" in
-      -h|--help) cmd_help; return 0 ;;
       -*) parse_override_option OPTION_OVERRIDES "$1" "${2:-}"; shift 2 ;;
       *) die "new takes no arguments (got \"$1\")" ;;
     esac
@@ -247,7 +247,7 @@ cmd_new() {
 runner_state_summary() {
   local SUMMARY_TEXT
   if runner_is_active; then
-    SUMMARY_TEXT="runner ${COLOUR_GREEN}active${COLOUR_RESET} (pid $(cat "${RUNNER_PID_FILE}" 2>/dev/null || printf "?"))"
+    SUMMARY_TEXT="runner ${COLOUR_GREEN}active${COLOUR_RESET} (pid $(runner_recorded_pid))"
   else
     SUMMARY_TEXT="runner ${COLOUR_DIM}not running${COLOUR_RESET}"
   fi
@@ -286,7 +286,7 @@ print_job_row() {
   local ENGINE_TEXT PRIORITY_TEXT WHEN_TEXT
   ENGINE_TEXT="$(meta_get "${JOB_DIR}" engine)"
   if [[ -z "${ENGINE_TEXT}" ]]; then
-    ENGINE_TEXT="$(frontmatter_read "${JOB_DIR}/request.md" | awk -F'\t' '$1 == "engine" { print $2; exit }')"
+    ENGINE_TEXT="$(frontmatter_value "${JOB_DIR}/request.md" engine)"
   fi
   if [[ -z "${ENGINE_TEXT}" ]]; then
     ENGINE_TEXT="${CFG_DEFAULT_ENGINE:-(none)}"
@@ -334,7 +334,6 @@ cmd_ls() {
         SELECTED_STATES+=("${STATE_ITEMS[@]}")
         shift 2
         ;;
-      -h|--help) cmd_help; return 0 ;;
       *) die "unknown ls option: $1" ;;
     esac
   done
@@ -433,7 +432,6 @@ cmd_show() {
       --meta) SHOW_WHAT=meta; shift ;;
       --path) SHOW_WHAT=path; shift ;;
       --response) SHOW_WHAT=response; shift ;;
-      -h|--help) cmd_help; return 0 ;;
       -*) die "unknown show option: $1" ;;
       *) JOB_QUERY="$1"; shift ;;
     esac
@@ -474,7 +472,7 @@ cmd_tail() {
     job_find "${JOB_QUERY}"
   else
     local RUNNING_JOB_ID
-    RUNNING_JOB_ID="$(queue_list_jobs running | head -n 1 | cut -f2)"
+    RUNNING_JOB_ID="$(queue_running_job_id)"
     if [[ -z "${RUNNING_JOB_ID}" ]]; then
       die "no job is running (headrun tail ID to view a finished job's transcript)"
     fi
@@ -628,7 +626,6 @@ cmd_requeue() {
   while (( $# > 0 )); do
     case "$1" in
       --edit) EDIT_FIRST=1; shift ;;
-      -h|--help) cmd_help; return 0 ;;
       -*) parse_override_option OPTION_OVERRIDES "$1" "${2:-}"; shift 2 ;;
       *) JOB_QUERY="$1"; shift ;;
     esac
@@ -659,7 +656,7 @@ cmd_pause() {
   queue_ensure_dirs
   printf '%s\n' "$(now_epoch)" > "${PAUSED_FLAG_FILE}"
   local RUNNING_JOB_ID
-  RUNNING_JOB_ID="$(queue_list_jobs running | head -n 1 | cut -f2)"
+  RUNNING_JOB_ID="$(queue_running_job_id)"
   if [[ -n "${RUNNING_JOB_ID}" ]]; then
     log_info "paused; the current job (${RUNNING_JOB_ID}) will finish first"
   else
@@ -707,7 +704,7 @@ cmd_status() {
   queue_ensure_dirs
   printf '%s\n' "$(runner_state_summary)"
   local RUNNING_JOB_ID
-  RUNNING_JOB_ID="$(queue_list_jobs running | head -n 1 | cut -f2)"
+  RUNNING_JOB_ID="$(queue_running_job_id)"
   if [[ -n "${RUNNING_JOB_ID}" ]]; then
     local RUNNING_DIR="${JOBS_ROOT}/running/${RUNNING_JOB_ID}"
     local ELAPSED_SECONDS=$(( $(now_epoch) - $(meta_get "${RUNNING_DIR}" started_at "$(now_epoch)") ))
@@ -736,7 +733,6 @@ cmd_run() {
       --watch) WATCH_QUEUE=1; shift ;;
       --detach|-d) DETACH_RUNNER=1; shift ;;
       --quiet|-q) RUNNER_STREAM_OUTPUT=0; shift ;;
-      -h|--help) cmd_help; return 0 ;;
       *) die "unknown run option: $1" ;;
     esac
   done
@@ -918,8 +914,11 @@ cmd_doctor() {
   printf '\nRunner\n'
   doctor_line info "$(runner_state_summary)"
   if command -v loginctl > /dev/null; then
-    local LINGER_STATE
-    LINGER_STATE="$(loginctl show-user "$(id -un)" --property=Linger --value 2>/dev/null || printf 'unknown')"
+    local LINGER_STATE=""
+    if ! LINGER_STATE="$(loginctl show-user "$(id -un)" --property=Linger --value 2>&1)"; then
+      doctor_line warn "could not query systemd linger state: ${LINGER_STATE}"
+      LINGER_STATE="unknown"
+    fi
     if [[ "${LINGER_STATE}" == "yes" ]]; then
       doctor_line ok "systemd linger enabled (user services survive logout)"
     else
@@ -986,7 +985,11 @@ main() {
     version|-V|--version) cmd_version ;;
     *)
       config_load
+      if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+        COMMAND_NAME="help"
+      fi
       case "${COMMAND_NAME}" in
+        help) cmd_help ;;
         add) cmd_add "$@" ;;
         new) cmd_new "$@" ;;
         ls|list) cmd_ls "$@" ;;

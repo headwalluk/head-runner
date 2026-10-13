@@ -66,7 +66,7 @@ ssh headrun@box headrun show fancy
 | `headrun run` | Foreground; streams each transcript; exits when the queue is empty |
 | `headrun run --once` | Runs one job and exits |
 | `headrun run --watch` | Never exits on an empty queue; polls every `POLL_INTERVAL` |
-| `headrun run --detach [--watch]` | Same, in the background (`setsid`); output goes to `headrun.log` |
+| `headrun run --detach [--watch]` | Same, in the background (`setsid`); log lines go to `headrun.log`, raw output to `runner.out` |
 | `headrun run --quiet` | No transcript streaming (log lines only) |
 
 Only one runner can run per data directory. A second one refuses to start.
@@ -121,9 +121,10 @@ would happen.
 
 ## Upgrading and removal
 
-Re-run the installer. It replaces `~/.local/share/headrun/app` in one step and leaves your
-config, guides and jobs alone. A running runner keeps the code it started with, so restart
-it (or the service) afterwards.
+Re-run the installer. It builds the new version beside the old one, swaps the directories,
+and leaves your config, guides and jobs alone. A running runner keeps its core code in
+memory but reads engine adapters and prompt guides fresh for each job, so pause it, upgrade,
+then restart the runner (or the service) to avoid a job running with mixed versions.
 
 To uninstall, run `install.sh --uninstall`. It removes the program and the link and keeps
 `~/.config/headrun` and the jobs. Delete those by hand if you want them gone.

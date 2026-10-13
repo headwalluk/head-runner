@@ -235,6 +235,8 @@ jobsheet_validate() {
     VALIDATION_ERRORS+=("workdir is required (set \"workdir:\" in the frontmatter or DEFAULT_WORKDIR in the config)")
   elif [[ "${WORKDIR_VALUE}" != /* ]]; then
     VALIDATION_ERRORS+=("workdir must be an absolute path: ${WORKDIR_VALUE}")
+  elif [[ -e "${WORKDIR_VALUE}" && ! -d "${WORKDIR_VALUE}" ]]; then
+    VALIDATION_ERRORS+=("workdir exists but is not a directory: ${WORKDIR_VALUE}")
   elif [[ ! -d "${WORKDIR_VALUE}" ]]; then
     if [[ "${JOB_FIELDS[create_workdir]:-}" =~ ^(yes|true|1)$ ]]; then
       : # created by the runner at run time
@@ -308,7 +310,7 @@ jobsheet_title() {
   local JOBSHEET_FILE="$1"
   local FALLBACK_TITLE="$2"
   local JOB_TITLE
-  JOB_TITLE="$(frontmatter_read "${JOBSHEET_FILE}" | awk -F'\t' '$1 == "title" { print $2; exit }')"
+  JOB_TITLE="$(frontmatter_value "${JOBSHEET_FILE}" title)"
   if [[ -z "${JOB_TITLE}" ]]; then
     JOB_TITLE="$(frontmatter_first_heading "${JOBSHEET_FILE}")"
   fi
@@ -340,7 +342,7 @@ queue_enqueue_locked() {
 job_priority() {
   local JOB_DIR="$1"
   local JOB_PRIORITY
-  JOB_PRIORITY="$(frontmatter_read "${JOB_DIR}/request.md" | awk -F'\t' '$1 == "priority" { print $2; exit }')"
+  JOB_PRIORITY="$(frontmatter_value "${JOB_DIR}/request.md" priority)"
   if [[ ! "${JOB_PRIORITY}" =~ ^[0-9]{1,3}$ ]]; then
     JOB_PRIORITY="${CFG_DEFAULT_PRIORITY}"
   fi
@@ -359,4 +361,9 @@ queue_pending_in_order() {
     fi
     printf '%03d\t%s\t%s\n' "$(job_priority "${JOB_DIR}")" "${QUEUED_ORDER}" "${JOB_ID}"
   done < <(queue_list_jobs pending) | sort -t $'\t' -k1,1n -k2,2n -k3,3 | cut -f3
+}
+
+# Prints the id of the running job, or nothing.
+queue_running_job_id() {
+  queue_list_jobs running | cut -f2 | sed -n 1p
 }
