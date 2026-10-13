@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] - 2026-10-13
+
+### Changed
+
+- `headrun doctor` reports the systemd runner service separately from the runner process.
+  It shows one of:
+  - not installed, with the `headrun install-service --enable` hint
+  - installed but inactive or failed, with the command to start it
+  - active, with its enabled state
+
 ## [0.12.0] - 2026-10-13
 
 ### Fixed

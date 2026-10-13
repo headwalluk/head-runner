@@ -921,6 +921,7 @@ cmd_doctor() {
 
   printf '\nRunner\n'
   doctor_line info "$(runner_state_summary)"
+  doctor_report_service
   if command -v loginctl > /dev/null; then
     local LINGER_STATE=""
     if ! LINGER_STATE="$(loginctl show-user "$(id -un)" --property=Linger --value 2>&1)"; then
@@ -939,6 +940,32 @@ cmd_doctor() {
     die "${FAILURE_COUNT} required check(s) failed"
   fi
   log_info "all required checks passed"
+}
+
+# Prints the systemd user service state for doctor: not installed, installed but stopped, or active.
+doctor_report_service() {
+  local UNIT_FILE="${USER_HOME}/.config/systemd/user/headrun.service"
+  if ! command -v systemctl > /dev/null; then
+    doctor_line info "runner service: systemd not available (use headrun run --detach --watch)"
+  elif [[ ! -f "${UNIT_FILE}" ]]; then
+    doctor_line info "runner service: not installed (to run the queue continuously: headrun install-service --enable)"
+  else
+    # is-active and is-enabled exit non-zero for states such as "inactive"; the printed word is the answer.
+    local ACTIVE_STATE ENABLED_STATE
+    ACTIVE_STATE="$(systemctl --user is-active headrun.service 2>&1)" || true
+    ENABLED_STATE="$(systemctl --user is-enabled headrun.service 2>&1)" || true
+    case "${ACTIVE_STATE}" in
+      active)
+        doctor_line ok "runner service: active, ${ENABLED_STATE} (systemctl --user status headrun)"
+        ;;
+      inactive|failed|activating|deactivating)
+        doctor_line warn "runner service: installed but ${ACTIVE_STATE}, ${ENABLED_STATE} (start it with: systemctl --user daemon-reload && systemctl --user enable --now headrun.service)"
+        ;;
+      *)
+        doctor_line warn "runner service: could not query systemd user services: ${ACTIVE_STATE}"
+        ;;
+    esac
+  fi
 }
 
 # headrun install-service: write (and optionally enable) a systemd user unit for the runner.

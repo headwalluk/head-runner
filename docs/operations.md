@@ -89,7 +89,7 @@ SIGTERM") and exits. If you'd rather let the job finish, use `headrun pause` and
 then stop the service.
 
 On a headless account, `loginctl enable-linger <user>` (as root) is required, or the
-service stops when you log out. `headrun doctor` reports the linger state.
+service stops when you log out. `headrun doctor` reports the linger state, and whether the service is installed and active.
 
 ## Pause, stop and recovery
 
