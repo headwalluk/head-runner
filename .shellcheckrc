@@ -1,0 +1,5 @@
+# shellcheck configuration (make lint)
+source-path=SCRIPTDIR
+external-sources=true
+# Markdown backticks inside single-quoted printf formats are intentional.
+disable=SC2016

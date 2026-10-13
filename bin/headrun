@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# headrun: filesystem job queue runner for agentic coding tasks (Markdown in, Markdown out).
+
+set -o errexit -o nounset -o pipefail
+shopt -s inherit_errexit nullglob
+
+if (( BASH_VERSINFO[0] < 4 || ( BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4 ) )); then
+  printf 'headrun: error: bash 4.4 or newer is required (found %s)\n' "${BASH_VERSION}" >&2
+  exit 1
+fi
+
+HEADRUN_ENTRY_SCRIPT="${BASH_SOURCE[0]}"
+HEADRUN_LIBRARY_DIR="$(cd "$(dirname "$(readlink -f "${HEADRUN_ENTRY_SCRIPT}")")/../lib" && pwd)"
+
+# shellcheck source=../lib/log.sh
+source "${HEADRUN_LIBRARY_DIR}/log.sh"
+# shellcheck source=../lib/util.sh
+source "${HEADRUN_LIBRARY_DIR}/util.sh"
+# shellcheck source=../lib/config.sh
+source "${HEADRUN_LIBRARY_DIR}/config.sh"
+# shellcheck source=../lib/frontmatter.sh
+source "${HEADRUN_LIBRARY_DIR}/frontmatter.sh"
+# shellcheck source=../lib/queue.sh
+source "${HEADRUN_LIBRARY_DIR}/queue.sh"
+# shellcheck source=../lib/runner.sh
+source "${HEADRUN_LIBRARY_DIR}/runner.sh"
+# shellcheck source=../lib/commands.sh
+source "${HEADRUN_LIBRARY_DIR}/commands.sh"
+
+main "$@"

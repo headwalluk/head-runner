@@ -1,0 +1,41 @@
+# headrun configuration: ~/.config/headrun/config
+# KEY=value, one per line. Blank lines and lines starting with # are ignored.
+# Every setting is optional; the values shown are the defaults.
+
+# Engine used when a jobsheet has no "engine:" key. Empty (or "null") means no default:
+# such jobs fail when they run. Built-in engines: claude, opencode, codex, shell, stub.
+DEFAULT_ENGINE=
+
+# Working directory used when a jobsheet has no "workdir:" key. Empty means workdir is required.
+DEFAULT_WORKDIR=
+
+# Maximum run time per job, e.g. 45m, 2h, 1h30m.
+DEFAULT_TIMEOUT=2h
+
+# Priority for jobs that do not set one (0-999, lower runs first).
+DEFAULT_PRIORITY=50
+
+# Permission mode passed to engines: bypass | auto | edits | readonly.
+# Unattended agents usually need bypass; see docs/security.md.
+DEFAULT_PERMISSIONS=bypass
+
+# Runner log verbosity: debug | info | warn | error.
+LOG_LEVEL=info
+
+# How often a watching or paused runner checks the queue.
+POLL_INTERVAL=5s
+
+# How long a job may ignore SIGTERM (on timeout or stop) before it is killed.
+KILL_GRACE=30s
+
+# Number of finished jobs shown by "headrun ls" (use --all to see everything).
+RECENT_LIMIT=10
+
+# Default age for "headrun prune".
+PRUNE_AFTER=30d
+
+# Engine binaries: <ENGINE>_BIN=command-or-path. Defaults to the engine name on PATH.
+# Useful under systemd, where PATH may not include ~/.local/bin or ~/.opencode/bin.
+# CLAUDE_BIN=/home/headrun/.local/bin/claude
+# OPENCODE_BIN=/home/headrun/.opencode/bin/opencode
+# CODEX_BIN=codex
