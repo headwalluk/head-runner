@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-10-13
+
+### Added
+
+- Test suite (`make test`): a dependency-free harness running each test in an isolated
+  sandbox, covering parsing, validation, queue ordering, lookup, prune, runner outcomes,
+  timeouts, pause/stop, lock contention and orphan recovery. Passes with gawk and mawk.
+- `make lint` runs shellcheck over the whole program.
+
 ## [0.1.0] - 2026-10-13
 
 ### Added
