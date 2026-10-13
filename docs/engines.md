@@ -7,7 +7,7 @@ and a user adapter with the same name replaces the built-in one.
 | Engine | Tool | Notes |
 |---|---|---|
 | `claude` | Claude Code, `claude --print` | Streams JSON; with `jq`, the transcript is rendered readably and the session ID, cost and turns are recorded |
-| `opencode` | OpenCode, `opencode run` | With `jq`, uses JSON events and recovers the final message and cost from `opencode export` |
+| `opencode` | OpenCode 1.x and 2.x, `opencode run` | With `jq`, uses JSON events and recovers the final message and cost from the session export. 2.x runs `--standalone` (its own private server, not the background service) |
 | `codex` | OpenAI Codex CLI, `codex exec` | Written from Codex's documented flags; **not yet tested against a live install** |
 | `shell` | `bash -c "$command"` | Runs the jobsheet's `command:` with the request body on stdin; stdout becomes the response |
 | `stub` | none | Deterministic response, no LLM. For testing the queue and runner |
@@ -35,10 +35,10 @@ adapter:
 
 | Mode | `claude` | `opencode` | `codex` |
 |---|---|---|---|
-| `bypass` | `--dangerously-skip-permissions` | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` |
-| `auto` | `--permission-mode auto` | `opencode.json` rules; prompts auto-rejected | `--full-auto` |
-| `edits` | `--permission-mode acceptEdits` | `opencode.json` rules; prompts auto-rejected | `--full-auto` |
-| `readonly` | `--permission-mode plan` | `opencode.json` rules; prompts auto-rejected | `--sandbox read-only` |
+| `bypass` | `--dangerously-skip-permissions` | 2.x: `--auto`; 1.x: `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` |
+| `auto` | `--permission-mode auto` | `opencode.json` rules, no auto-approval | `--full-auto` |
+| `edits` | `--permission-mode acceptEdits` | `opencode.json` rules, no auto-approval | `--full-auto` |
+| `readonly` | `--permission-mode plan` | `opencode.json` rules, no auto-approval | `--sandbox read-only` |
 
 Nobody is present to approve actions, so most real work needs `bypass`. Read
 [security](security.md) before relying on it. The other modes suit read-only analysis.
@@ -48,6 +48,11 @@ directory), so the runner tells it to make its final message the response instea
 The jobsheet's `dirs:` are passed to `claude` and `codex` as `--add-dir`. OpenCode has no
 equivalent flag, so in modes other than `bypass` it refuses to read outside `workdir`.
 Allow those paths in `opencode.json`, or use `bypass`.
+
+OpenCode 2.x's `--auto` approves anything your `opencode.json` doesn't explicitly deny,
+so `deny` rules still apply in `bypass` mode. Without `model:`, OpenCode picks its own
+default, which may be a free model; set `model:` (e.g. `anthropic/claude-sonnet-5-5`) to be
+sure.
 
 ## `shell` engine
 

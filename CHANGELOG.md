@@ -4,7 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.7.0] - 2026-10-13
+
+### Fixed
+
+- OpenCode 2.x support. 2.x dropped `--dir` and `--dangerously-skip-permissions`, so jobs
+  only got its help text. The adapter now detects the major version: 2.x runs
+  `opencode run --standalone` in `workdir`, maps `bypass` to `--auto`, and reads the
+  final message and cost from `opencode session export`, whose format changed. 1.x
+  behaves as before. The OpenCode version is recorded in `meta` as `engine_version`.
 
 ### Documentation
 
