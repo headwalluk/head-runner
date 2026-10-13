@@ -200,6 +200,7 @@ FAKE_SCRIPT
   assert_contains "${ARGUMENT_TEXT}" "--approval-mode yolo"
   assert_contains "${ARGUMENT_TEXT}" "--model flash"
   assert_contains "${ARGUMENT_TEXT}" "--include-directories /srv/reference"
+  assert_contains "${ARGUMENT_TEXT}" "--include-directories ${HEADRUN_HOME}/jobs/running/${JOB_ID}"
   assert_contains "${ARGUMENT_TEXT}" "--skip-trust"
   assert_contains "$(< "${TEST_SANDBOX_ROOT}/gemini-stdin")" "Please do the thing."
 }

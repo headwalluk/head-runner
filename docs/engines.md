@@ -9,7 +9,7 @@ and a user adapter with the same name replaces the built-in one.
 | `claude` | Claude Code, `claude --print` | Streams JSON; with `jq`, the transcript is rendered readably and the session ID, cost and turns are recorded |
 | `opencode` | OpenCode 1.x and 2.x, `opencode run` | With `jq`, uses JSON events and recovers the final message and cost from the session export. 2.x runs `--standalone` (its own private server, not the background service) |
 | `codex` | OpenAI Codex CLI, `codex exec` | Records the session ID, token count and Codex version; the final message comes from `--output-last-message` |
-| `gemini` | Google Gemini CLI, `gemini -p` | Streams JSON; with `jq`, the transcript is rendered and the session ID and token counts recorded (Gemini reports no cost). Written from Gemini CLI's documented flags and tested against a simulated CLI; **not yet tested against a live install** |
+| `gemini` | Google Gemini CLI, `gemini -p` | Streams JSON; with `jq`, the transcript is rendered and the session ID and token counts recorded (Gemini reports no cost). Verified live with Gemini CLI 0.63.0 in `bypass` mode |
 | `shell` | `bash -c "$command"` | Runs the jobsheet's `command:` with the request body on stdin; stdout becomes the response |
 | `stub` | none | Deterministic response, no LLM. For testing the queue and runner |
 
@@ -55,8 +55,11 @@ For `codex`, `--add-dir` makes the directory writable as well as readable. In `e
 mode Codex's sandbox allows writes only to `workdir`, `dirs` and `/tmp`, so a job there
 can still build and test; it delivers its response as its final message.
 
-Gemini CLI runs with `--skip-trust` when the installed version supports it, because
-nobody is there to answer its folder-trust prompt. The composed prompt goes on stdin.
+Gemini CLI restricts file writes to its workspace even in `yolo` mode, so the adapter also
+passes the job directory with `--include-directories`, letting the agent write
+`response.md`. Gemini can still refuse some shell commands "by policy" in `yolo` mode.
+It runs with `--skip-trust` when the installed version supports it, because nobody is
+there to answer its folder-trust prompt. The composed prompt goes on stdin.
 
 OpenCode 2.x's `--auto` approves anything your `opencode.json` doesn't explicitly deny,
 so `deny` rules still apply in `bypass` mode. Without `model:`, OpenCode picks its own

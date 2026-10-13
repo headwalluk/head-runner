@@ -46,6 +46,8 @@ if [[ -n "${HEADRUN_DIRS}" ]]; then
     GEMINI_ARGUMENTS+=(--include-directories "${EXTRA_DIRECTORY}")
   done
 fi
+# Gemini confines file writes to its workspace even in yolo mode, so the job directory is added for response.md.
+GEMINI_ARGUMENTS+=(--include-directories "${HEADRUN_JOB_DIR}")
 # Nobody can answer the folder-trust prompt unattended; older releases lack the flag.
 if "${GEMINI_COMMAND}" --help 2>&1 | grep -q -e '--skip-trust'; then
   GEMINI_ARGUMENTS+=(--skip-trust)

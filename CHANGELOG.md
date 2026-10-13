@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-10-13
+
+### Fixed
+
+- Gemini: the job directory is added to the workspace with `--include-directories`.
+  Gemini confines writes to its workspace even in `yolo` mode, so the agent couldn't write
+  `response.md` normally.
+
+### Added
+
+- Example `examples/gemini-hello-go.md`: a Go "Hello Go!" banner, centred in the terminal.
+
+### Verified
+
+- Gemini CLI 0.63.0 live in `bypass` mode: the hello-go job completed in 9 minutes and its
+  claimed results were confirmed independently.
+
 ## [0.10.0] - 2026-10-13
 
 ### Changed
