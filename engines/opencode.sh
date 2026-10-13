@@ -12,7 +12,8 @@ case "${ADAPTER_ACTION}" in
       printf '%s not found (set OPENCODE_BIN in the config)\n' "${OPENCODE_COMMAND}"
       exit 1
     fi
-    printf 'opencode %s\n' "$("${OPENCODE_COMMAND}" --version 2>&1 | sed -n 1p)"
+    OPENCODE_VERSION_TEXT="$("${OPENCODE_COMMAND}" --version 2>&1 | sed -n 1p)"
+    printf 'opencode %s\n' "${OPENCODE_VERSION_TEXT#opencode }"
     exit 0
     ;;
   run) ;;

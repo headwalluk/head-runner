@@ -4,8 +4,8 @@
 
 You write a *jobsheet*: a Markdown file with a short frontmatter block (which engine, which
 project directory) and a detailed request. `headrun` queues it, and a runner works through
-the queue one job at a time. Each job goes to Claude Code, OpenCode, Codex or a plain shell
-command, and the result is a Markdown response saying what was done.
+the queue one job at a time. Each job goes to Claude Code, OpenCode, Codex, Gemini CLI or a
+plain shell command, and the result is a Markdown response saying what was done.
 
 - **Near-zero dependencies.** Bash 4.4+, `flock`, coreutils and awk. `jq` is optional.
 - **Greppable.** Every job is a directory of plain files, and its state is the folder it
@@ -34,7 +34,7 @@ headrun doctor
 To pin a version, set `HEADRUN_REF=v1.0.0` before running the installer. To remove the
 program but keep your config and jobs: `curl -fsSL …/install.sh | bash -s -- --uninstall`.
 
-Each agent CLI (`claude`, `opencode`, `codex`) must already be installed, logged in and
+Each agent CLI (`claude`, `opencode`, `codex`, `gemini`) must already be installed, logged in and
 working in a terminal for the account that runs `headrun`.
 
 ## Quick start

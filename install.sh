@@ -191,7 +191,7 @@ main() {
 
   local ENGINE_COMMAND
   local -a FOUND_ENGINES=()
-  for ENGINE_COMMAND in claude opencode codex; do
+  for ENGINE_COMMAND in claude opencode codex gemini; do
     if command -v "${ENGINE_COMMAND}" > /dev/null; then
       FOUND_ENGINES+=("${ENGINE_COMMAND}")
     fi
@@ -199,7 +199,7 @@ main() {
   if (( ${#FOUND_ENGINES[@]} > 0 )); then
     say "engines found on PATH: ${FOUND_ENGINES[*]}"
   else
-    say "no agent CLIs found on PATH (claude, opencode, codex); the shell and stub engines still work"
+    say "no agent CLIs found on PATH (claude, opencode, codex, gemini); the shell and stub engines still work"
   fi
   if ! command -v jq > /dev/null; then
     say "optional: install jq for readable Claude/OpenCode transcripts"

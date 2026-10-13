@@ -9,6 +9,7 @@ and a user adapter with the same name replaces the built-in one.
 | `claude` | Claude Code, `claude --print` | Streams JSON; with `jq`, the transcript is rendered readably and the session ID, cost and turns are recorded |
 | `opencode` | OpenCode 1.x and 2.x, `opencode run` | With `jq`, uses JSON events and recovers the final message and cost from the session export. 2.x runs `--standalone` (its own private server, not the background service) |
 | `codex` | OpenAI Codex CLI, `codex exec` | Written from Codex's documented flags; **not yet tested against a live install** |
+| `gemini` | Google Gemini CLI, `gemini -p` | Streams JSON; with `jq`, the transcript is rendered and the session ID and token counts recorded (Gemini reports no cost). Written from Gemini CLI's documented flags and tested against a simulated CLI; **not yet tested against a live install** |
 | `shell` | `bash -c "$command"` | Runs the jobsheet's `command:` with the request body on stdin; stdout becomes the response |
 | `stub` | none | Deterministic response, no LLM. For testing the queue and runner |
 
@@ -33,21 +34,25 @@ Any `<NAME>_BIN` setting is passed to the adapter for engine `name` as
 The jobsheet's `permissions:` key (default `DEFAULT_PERMISSIONS=bypass`) is mapped by each
 adapter:
 
-| Mode | `claude` | `opencode` | `codex` |
-|---|---|---|---|
-| `bypass` | `--dangerously-skip-permissions` | 2.x: `--auto`; 1.x: `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` |
-| `auto` | `--permission-mode auto` | `opencode.json` rules, no auto-approval | `--full-auto` |
-| `edits` | `--permission-mode acceptEdits` | `opencode.json` rules, no auto-approval | `--full-auto` |
-| `readonly` | `--permission-mode plan` | `opencode.json` rules, no auto-approval | `--sandbox read-only` |
+| Mode | `claude` | `opencode` | `codex` | `gemini` |
+|---|---|---|---|---|
+| `bypass` | `--dangerously-skip-permissions` | 2.x: `--auto`; 1.x: `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--approval-mode yolo` |
+| `auto` | `--permission-mode auto` | `opencode.json` rules, no auto-approval | `--full-auto` | `--approval-mode auto_edit` |
+| `edits` | `--permission-mode acceptEdits` | `opencode.json` rules, no auto-approval | `--full-auto` | `--approval-mode auto_edit` |
+| `readonly` | `--permission-mode plan` | `opencode.json` rules, no auto-approval | `--sandbox read-only` | `--approval-mode plan` |
 
 Nobody is present to approve actions, so most real work needs `bypass`. Read
 [security](security.md) before relying on it. The other modes suit read-only analysis.
 In those modes the agent can't write `response.md` (it sits outside the working
 directory), so the runner tells it to make its final message the response instead.
 
-The jobsheet's `dirs:` are passed to `claude` and `codex` as `--add-dir`. OpenCode has no
-equivalent flag, so in modes other than `bypass` it refuses to read outside `workdir`.
-Allow those paths in `opencode.json`, or use `bypass`.
+The jobsheet's `dirs:` are passed to `claude` and `codex` as `--add-dir`, and to `gemini`
+as `--include-directories`. OpenCode has no equivalent flag. In modes other than `bypass`,
+whether it may read outside `workdir` depends on your `opencode.json` (1.x rejects it by
+default). Allow those paths there, or use `bypass`.
+
+Gemini CLI runs with `--skip-trust` when the installed version supports it, because
+nobody is there to answer its folder-trust prompt. The composed prompt goes on stdin.
 
 OpenCode 2.x's `--auto` approves anything your `opencode.json` doesn't explicitly deny,
 so `deny` rules still apply in `bypass` mode. Without `model:`, OpenCode picks its own

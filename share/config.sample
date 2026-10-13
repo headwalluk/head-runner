@@ -3,7 +3,7 @@
 # Every setting is optional; the values shown are the defaults.
 
 # Engine used when a jobsheet has no "engine:" key. Empty (or "null") means no default:
-# such jobs fail when they run. Built-in engines: claude, opencode, codex, shell, stub.
+# such jobs fail when they run. Built-in engines: claude, opencode, codex, gemini, shell, stub.
 DEFAULT_ENGINE=
 
 # Working directory used when a jobsheet has no "workdir:" key. Empty means workdir is required.
@@ -39,3 +39,4 @@ PRUNE_AFTER=30d
 # CLAUDE_BIN=/home/headrun/.local/bin/claude
 # OPENCODE_BIN=/home/headrun/.opencode/bin/opencode
 # CODEX_BIN=codex
+# GEMINI_BIN=gemini

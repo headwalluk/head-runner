@@ -27,7 +27,7 @@ Keys are case-insensitive, and `-` is treated as `_`.
 | Key | Default | Meaning |
 |---|---|---|
 | `title` | first `#` heading, else file name | Shown in `headrun ls`; also used in the job ID |
-| `engine` | `DEFAULT_ENGINE` from config | `claude`, `opencode`, `codex`, `shell`, `stub`, or a custom adapter. With neither set, the job **fails** when it runs |
+| `engine` | `DEFAULT_ENGINE` from config | `claude`, `opencode`, `codex`, `gemini`, `shell`, `stub`, or a custom adapter. With neither set, the job **fails** when it runs |
 | `model` | engine's own default | Passed straight to the engine, e.g. `opus`, `sonnet`, `anthropic/claude-sonnet-5-5` |
 | `workdir` | `DEFAULT_WORKDIR` from config | **Required.** Absolute path; the engine runs here |
 | `create_workdir` | `no` | `yes` creates `workdir` when the job starts, instead of failing |

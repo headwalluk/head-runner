@@ -160,3 +160,46 @@ test_response_delivery_instruction_depends_on_permissions() {
   assert_contains "$(headrun show "${BYPASS_ID}" --prompt)" "Response delivery: write the response to"
   assert_contains "$(headrun show "${READONLY_ID}" --prompt)" "Response delivery: make your final message the complete response"
 }
+
+test_gemini_adapter_against_a_fake_cli() {
+  local FAKE_GEMINI="${TEST_SANDBOX_ROOT}/fake-gemini"
+  cat > "${FAKE_GEMINI}" <<FAKE_SCRIPT
+#!/usr/bin/env bash
+case "\$1" in
+  --version) echo 9.9.9; exit 0 ;;
+  --help) echo "  --skip-trust  Trust the workspace"; exit 0 ;;
+esac
+printf '%s\n' "\$@" > "${TEST_SANDBOX_ROOT}/gemini-arguments"
+cat > "${TEST_SANDBOX_ROOT}/gemini-stdin"
+cat <<'EVENTS'
+{"type":"init","timestamp":"t","session_id":"gem-session-1","model":"gemini-test"}
+{"type":"message","timestamp":"t","role":"user","content":"ignored"}
+{"type":"message","timestamp":"t","role":"assistant","content":"Let me look first.","delta":true}
+{"type":"tool_use","timestamp":"t","tool_name":"run_shell_command","tool_id":"1","parameters":{"command":"ls"}}
+{"type":"tool_result","timestamp":"t","tool_id":"1","status":"success","output":"x"}
+{"type":"message","timestamp":"t","role":"assistant","content":"Outcome: completed\n\n","delta":true}
+{"type":"message","timestamp":"t","role":"assistant","content":"All good.","delta":true}
+{"type":"result","timestamp":"t","status":"success","stats":{"input_tokens":10,"output_tokens":5,"tool_calls":1,"duration_ms":1200}}
+EVENTS
+FAKE_SCRIPT
+  chmod +x "${FAKE_GEMINI}"
+  printf 'GEMINI_BIN=%s\n' "${FAKE_GEMINI}" >> "${HEADRUN_CONFIG_DIR}/config"
+
+  local JOB_ID
+  JOB_ID="$(jobsheet "Gemini" "engine: gemini" "model: flash" "dirs: /srv/reference" | headrun add - 2>/dev/null)"
+  headrun run > /dev/null 2>&1
+  assert_equals "done" "$(job_state_of "${JOB_ID}")"
+  local RESPONSE_TEXT
+  RESPONSE_TEXT="$(headrun show "${JOB_ID}")"
+  assert_contains "${RESPONSE_TEXT}" "All good."
+  assert_not_contains "${RESPONSE_TEXT}" "Let me look first."
+  assert_equals "gem-session-1" "$(job_meta "${JOB_ID}" session_id)"
+  assert_equals "gemini 9.9.9" "$(job_meta "${JOB_ID}" engine_version)"
+  local ARGUMENT_TEXT
+  ARGUMENT_TEXT="$(tr '\n' ' ' < "${TEST_SANDBOX_ROOT}/gemini-arguments")"
+  assert_contains "${ARGUMENT_TEXT}" "--approval-mode yolo"
+  assert_contains "${ARGUMENT_TEXT}" "--model flash"
+  assert_contains "${ARGUMENT_TEXT}" "--include-directories /srv/reference"
+  assert_contains "${ARGUMENT_TEXT}" "--skip-trust"
+  assert_contains "$(< "${TEST_SANDBOX_ROOT}/gemini-stdin")" "Please do the thing."
+}

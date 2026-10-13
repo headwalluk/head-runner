@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-10-13
+
+### Added
+
+- `gemini` engine for Google Gemini CLI. It sends the prompt on stdin with
+  `--output-format stream-json`, renders the transcript through `gemini-render.jq`, and
+  maps permissions to `--approval-mode` (`yolo`, `auto_edit`, `plan`). `dirs` becomes
+  `--include-directories`, and `--skip-trust` is added when supported. The session ID and
+  token counts are recorded; Gemini reports no cost. Written from the documented flags and
+  tested against a simulated CLI, but not yet against a live install.
+
+### Fixed
+
+- `headrun doctor` no longer shows "opencode opencode" for OpenCode 2.x.
+
 ## [0.8.0] - 2026-10-13
 
 ### Fixed
