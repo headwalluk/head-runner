@@ -29,7 +29,7 @@ fi
 case "${HEADRUN_PERMISSIONS}" in
   bypass) OPENCODE_ARGUMENTS+=(--dangerously-skip-permissions) ;;
   auto|edits|readonly)
-    printf 'opencode: permissions "%s" defers to your opencode.json permission settings; unanswered prompts may stall the job\n' "${HEADRUN_PERMISSIONS}"
+    printf 'opencode: permissions "%s" uses your opencode.json permission settings; anything that would prompt is auto-rejected\n' "${HEADRUN_PERMISSIONS}"
     ;;
   *)
     printf 'opencode: unsupported permissions mode %s\n' "${HEADRUN_PERMISSIONS}" >&2
@@ -56,16 +56,46 @@ fi
 set -o errexit
 OPENCODE_STATUS="${PIPELINE_STATUSES[0]}"
 
+# "opencode run" can exit before flushing its last JSON events, so the session export is the reliable record.
 if command -v jq > /dev/null && [[ -s "${STREAM_FILE}" ]]; then
-  jq -R -s -r '
-    [split("\n")[] | try fromjson catch empty] as $events
-    | "session_id=\(($events | map(.sessionID // empty) | first) // "")",
-      "cost_usd=\($events | map(select(.type == "step_finish") | .part.cost // 0) | add // "")"
-  ' "${STREAM_FILE}" >> "${HEADRUN_ENGINE_META}"
+  SESSION_ID="$(jq -R -r 'try fromjson catch empty | .sessionID // empty' "${STREAM_FILE}" | head -n 1)"
+  EXPORT_FILE="${HEADRUN_JOB_DIR}/opencode-session.json"
+  if [[ -n "${SESSION_ID}" ]]; then
+    printf 'session_id=%s\n' "${SESSION_ID}" >> "${HEADRUN_ENGINE_META}"
+    if ! "${OPENCODE_COMMAND}" export "${SESSION_ID}" > "${EXPORT_FILE}" 2>> "${HEADRUN_JOB_DIR}/transcript.log"; then
+      printf 'opencode: could not export session %s; falling back to the event stream\n' "${SESSION_ID}"
+      rm -f "${EXPORT_FILE}"
+    fi
+  fi
+
+  FINAL_MESSAGE_FILE="${HEADRUN_JOB_DIR}/opencode-final-message.md"
+  if [[ -s "${EXPORT_FILE:-}" ]] && jq -e '.messages' "${EXPORT_FILE}" > /dev/null 2>&1; then
+    jq -r '"cost_usd=\([.messages[].info.cost // 0] | add | . * 1000000 | round / 1000000)"' "${EXPORT_FILE}" >> "${HEADRUN_ENGINE_META}"
+    jq -r '
+      [.messages[] | select(.info.role == "assistant")] | last
+      | if . == null then empty else [.parts[]? | select(.type == "text") | .text] | join("\n\n") end
+    ' "${EXPORT_FILE}" > "${FINAL_MESSAGE_FILE}"
+  else
+    jq -R -s -r '
+      [split("\n")[] | try fromjson catch empty] as $events
+      | "cost_usd=\($events | map(select(.type == "step_finish") | .part.cost // 0) | add // 0 | . * 1000000 | round / 1000000)"
+    ' "${STREAM_FILE}" >> "${HEADRUN_ENGINE_META}"
+    jq -R -s -r '
+      [split("\n")[] | try fromjson catch empty | select(.type == "text")] as $text_events
+      | if ($text_events | length) == 0 then empty else
+          ($text_events | last | .part.messageID) as $final_message
+          | $text_events | map(select(.part.messageID == $final_message) | .part.text) | join("\n\n")
+        end
+    ' "${STREAM_FILE}" > "${FINAL_MESSAGE_FILE}"
+  fi
+
   if [[ ! -s "${HEADRUN_RESPONSE}" ]]; then
-    jq -R -s -r '[split("\n")[] | try fromjson catch empty | select(.type == "text") | .part.text] | last // empty' \
-      "${STREAM_FILE}" > "${HEADRUN_RESPONSE}"
-    printf 'opencode: no response file written; used the final text message instead\n'
+    if [[ -n "$(tr -d '[:space:]' < "${FINAL_MESSAGE_FILE}")" ]]; then
+      cp "${FINAL_MESSAGE_FILE}" "${HEADRUN_RESPONSE}"
+      printf 'opencode: no response file written; used the final message instead\n'
+    else
+      printf 'opencode: no response file written and no final message to use\n'
+    fi
   fi
 fi
 

@@ -14,8 +14,9 @@ until the job has finished.
 
 ## Your response
 
-When you have finished, write your response as Markdown to the **response file** given in
-the job context below. Do not add YAML frontmatter; the runner adds its own.
+When you have finished, deliver your response as Markdown in the way the **Response
+delivery** line of the job context below describes. Do not add YAML frontmatter; the
+runner adds its own.
 
 Start the response with an outcome line, exactly one of:
 
@@ -29,5 +30,3 @@ Then cover:
 2. Files created or changed (paths), and where any detailed notes live.
 3. Assumptions you made.
 4. Anything left undone, open questions, or follow-up work for the operator.
-
-Your final message in this session should be a one-paragraph summary of the same.

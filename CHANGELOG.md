@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-10-13
+
+### Changed
+
+- The job context now tells the agent how to deliver its response: write `response.md` in
+  `bypass` mode, otherwise make the final message the response (other modes cannot write
+  outside the working directory).
+- A job that exits successfully without producing a response is now marked failed.
+
+### Fixed
+
+- OpenCode: the final message is recovered from `opencode export`, because `opencode run
+  --format json` can exit before flushing its last events. Cost comes from the export too.
+- Whitespace-only responses are treated as missing.
+
+### Verified
+
+- Live runs of the `claude` and `opencode` adapters in `readonly` mode (streaming
+  transcript, session id, cost, final-message fallback, outcome parsing).
+
 ## [0.3.0] - 2026-10-13
 
 ### Added

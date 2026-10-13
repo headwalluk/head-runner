@@ -70,7 +70,12 @@ if command -v jq > /dev/null && [[ -s "${STREAM_FILE}" ]]; then
       <<< "${RESULT_EVENT}" >> "${HEADRUN_ENGINE_META}"
     if [[ ! -s "${HEADRUN_RESPONSE}" ]]; then
       jq -r '.result // empty' <<< "${RESULT_EVENT}" > "${HEADRUN_RESPONSE}"
-      printf 'claude: no response file written; used the final result message instead\n'
+      if [[ -s "${HEADRUN_RESPONSE}" ]]; then
+        printf 'claude: no response file written; used the final message instead\n'
+      else
+        rm -f "${HEADRUN_RESPONSE}"
+        printf 'claude: no response file written and no final message to use\n'
+      fi
     fi
   fi
 fi

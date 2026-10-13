@@ -37,11 +37,12 @@ test_blocked_outcome_marks_job_failed() {
   assert_contains "$(headrun show "${JOB_ID}")" "reason: the agent reported the outcome as blocked"
 }
 
-test_missing_response_gets_runner_fallback() {
+test_missing_response_fails_with_runner_fallback() {
   local JOB_ID
   JOB_ID="$(add_stub_job "Silent" "stub_silent: yes")"
   headrun run > /dev/null 2>&1
-  assert_equals "done" "$(job_state_of "${JOB_ID}")"
+  assert_equals failed "$(job_state_of "${JOB_ID}")"
+  assert_contains "$(job_meta "${JOB_ID}" reason)" "produced no response"
   assert_equals runner "$(job_meta "${JOB_ID}" response_source)"
   assert_contains "$(headrun show "${JOB_ID}")" "# No response written"
 }
@@ -149,4 +150,13 @@ test_orphaned_running_job_is_recovered() {
   headrun run > /dev/null 2>&1
   assert_equals failed "$(job_state_of "${JOB_ID}")"
   assert_contains "$(job_meta "${JOB_ID}" reason)" "orphaned"
+}
+
+test_response_delivery_instruction_depends_on_permissions() {
+  local BYPASS_ID READONLY_ID
+  BYPASS_ID="$(add_stub_job "Bypass mode")"
+  READONLY_ID="$(add_stub_job "Readonly mode" "permissions: readonly")"
+  headrun run > /dev/null 2>&1
+  assert_contains "$(headrun show "${BYPASS_ID}" --prompt)" "Response delivery: write the response to"
+  assert_contains "$(headrun show "${READONLY_ID}" --prompt)" "Response delivery: make your final message the complete response"
 }

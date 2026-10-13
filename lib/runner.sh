@@ -101,6 +101,7 @@ runner_compose_prompt() {
   local JOB_DIR="$1"
   local WORKDIR_PATH="$2"
   local EXTRA_DIRECTORIES="$3"
+  local PERMISSION_MODE="$4"
   local GUIDE_NAME GUIDE_PATH
   {
     for GUIDE_NAME in preamble.md safety.md; do
@@ -119,8 +120,11 @@ runner_compose_prompt() {
     if [[ -n "${EXTRA_DIRECTORIES}" ]]; then
       printf -- '- Additional directories: %s\n' "${EXTRA_DIRECTORIES}"
     fi
-    printf -- '- Response file (write your final Markdown response here): %s\n' "${JOB_DIR}/response.md"
-    printf -- '- Original jobsheet: %s\n' "${JOB_DIR}/request.md"
+    if [[ "${PERMISSION_MODE}" == "bypass" ]]; then
+      printf -- '- Response delivery: write the response to %s, then end with a one-paragraph summary as your final message.\n' "${JOB_DIR}/response.md"
+    else
+      printf -- '- Response delivery: make your final message the complete response; the runner saves it. Do not try to write a response file (it is outside your permitted directories).\n'
+    fi
     printf '\n---\n\n# Request\n\n'
     frontmatter_body "${JOB_DIR}/request.md"
   } > "${JOB_DIR}/prompt.md"
@@ -155,14 +159,15 @@ runner_finalise_job() {
   local FINISHED_EPOCH
   FINISHED_EPOCH="$(now_epoch)"
 
-  if [[ ! -s "${RESPONSE_FILE}" ]]; then
+  local FINAL_STATE="${PROPOSED_STATE}"
+  if [[ ! -f "${RESPONSE_FILE}" || -z "$(tr -d '[:space:]' < "${RESPONSE_FILE}")" ]]; then
+    if [[ "${FINAL_STATE}" == "done" ]]; then
+      FINAL_STATE="failed"
+      FAILURE_REASON="the engine exited successfully but produced no response"
+    fi
     {
       printf '# No response written\n\n'
-      if [[ -n "${FAILURE_REASON}" ]]; then
-        printf 'The job did not complete: %s.\n\n' "${FAILURE_REASON}"
-      else
-        printf 'The engine exited successfully but did not write a response.\n\n'
-      fi
+      printf 'The job did not complete: %s.\n\n' "${FAILURE_REASON}"
       if [[ -s "${JOB_DIR}/transcript.log" ]]; then
         printf 'Last 40 lines of `transcript.log`:\n\n```text\n'
         tail -n 40 "${JOB_DIR}/transcript.log"
@@ -174,7 +179,6 @@ runner_finalise_job() {
     meta_set "${JOB_DIR}" response_source engine
   fi
 
-  local FINAL_STATE="${PROPOSED_STATE}"
   local RESPONSE_OUTCOME
   RESPONSE_OUTCOME="$(runner_response_outcome "${RESPONSE_FILE}")"
   if [[ "${FINAL_STATE}" == "done" && ( "${RESPONSE_OUTCOME}" == "blocked" || "${RESPONSE_OUTCOME}" == "partial" ) ]]; then
@@ -292,7 +296,7 @@ runner_run_job() {
   meta_set "${JOB_DIR}" timeout "${TIMEOUT_SECONDS}"
   meta_set "${JOB_DIR}" permissions "${PERMISSION_MODE}"
 
-  runner_compose_prompt "${JOB_DIR}" "${WORKDIR_PATH}" "${EXTRA_DIRECTORIES}"
+  runner_compose_prompt "${JOB_DIR}" "${WORKDIR_PATH}" "${EXTRA_DIRECTORIES}" "${PERMISSION_MODE}"
   : > "${JOB_DIR}/transcript.log"
 
   local -a ADAPTER_ENVIRONMENT=(
