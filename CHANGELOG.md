@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.0] - 2026-10-13
+
+First stable release. From here on, the jobsheet format, CLI commands and options, config
+keys and data layout follow semantic versioning.
+
+### Verified live
+
+- OpenCode 2.x in `bypass` mode on a headless host.
+- Codex 0.162 in `edits` mode.
+- Gemini CLI 0.63 in `bypass` mode.
+- Claude Code in `readonly` mode.
+
+### Not yet verified
+
+- Claude Code in `bypass` mode.
+- Gemini writing `response.md` after the 0.11.0 workspace fix.
+- `install-service --enable` on a headless account.
+
 ## [0.13.0] - 2026-10-13
 
 ### Changed
