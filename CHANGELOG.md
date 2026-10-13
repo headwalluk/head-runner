@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-10-13
+
+### Fixed
+
+- `headrun ls` sizes the ID column to the longest ID shown, so long job titles no longer
+  push the other columns out of line.
+
+### Verified
+
+- OpenCode 2.x in `bypass` mode on a headless host: two Go milestone jobs completed with
+  session ID, cost and engine version recorded.
+
 ## [0.7.0] - 2026-10-13
 
 ### Fixed

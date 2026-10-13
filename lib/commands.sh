@@ -279,6 +279,7 @@ state_colour() {
 print_job_row() {
   local STATE_NAME="$1"
   local JOB_ID="$2"
+  local ID_WIDTH="$3"
   local JOB_DIR="${JOBS_ROOT}/${STATE_NAME}/${JOB_ID}"
   local NOW_SECONDS
   NOW_SECONDS="$(now_epoch)"
@@ -310,9 +311,9 @@ print_job_row() {
     REASON_TEXT=" ${COLOUR_DIM}(${REASON_TEXT:0:60})${COLOUR_RESET}"
   fi
 
-  printf '%s%-9s%s %-44s %3s  %-9s %-14s %s%s\n' \
+  printf '%s%-9s%s %-*s %3s  %-9s %-14s %s%s\n' \
     "$(state_colour "${STATE_NAME}")" "${STATE_NAME}" "${COLOUR_RESET}" \
-    "${JOB_ID}" "${PRIORITY_TEXT}" "${ENGINE_TEXT:0:9}" "${WHEN_TEXT}" "${JOB_TITLE}" "${REASON_TEXT}"
+    "${ID_WIDTH}" "${JOB_ID}" "${PRIORITY_TEXT}" "${ENGINE_TEXT:0:9}" "${WHEN_TEXT}" "${JOB_TITLE}" "${REASON_TEXT}"
 }
 
 # headrun ls: list running and pending jobs plus recent finished jobs.
@@ -409,10 +410,17 @@ cmd_ls() {
   if (( ${#ROWS[@]} == 0 )); then
     printf '%sno jobs%s\n' "${COLOUR_DIM}" "${COLOUR_RESET}"
   else
-    printf '%s%-9s %-44s %3s  %-9s %-14s %s%s\n' "${COLOUR_DIM}" STATE ID PRI ENGINE WHEN TITLE "${COLOUR_RESET}"
-    local ROW_ENTRY
+    local ID_WIDTH=2
+    local ROW_ENTRY ROW_JOB_ID
     for ROW_ENTRY in "${ROWS[@]}"; do
-      print_job_row "${ROW_ENTRY%%/*}" "${ROW_ENTRY#*/}"
+      ROW_JOB_ID="${ROW_ENTRY#*/}"
+      if (( ${#ROW_JOB_ID} > ID_WIDTH )); then
+        ID_WIDTH="${#ROW_JOB_ID}"
+      fi
+    done
+    printf '%s%-9s %-*s %3s  %-9s %-14s %s%s\n' "${COLOUR_DIM}" STATE "${ID_WIDTH}" ID PRI ENGINE WHEN TITLE "${COLOUR_RESET}"
+    for ROW_ENTRY in "${ROWS[@]}"; do
+      print_job_row "${ROW_ENTRY%%/*}" "${ROW_ENTRY#*/}" "${ID_WIDTH}"
     done
   fi
   if (( HIDDEN_COUNT > 0 )); then

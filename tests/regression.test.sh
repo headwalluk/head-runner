@@ -83,3 +83,11 @@ test_zero_kill_grace_is_rejected() {
   if COMMAND_OUTPUT="$(headrun ls 2>&1)"; then fail "KILL_GRACE=0 should be rejected"; fi
   assert_contains "${COMMAND_OUTPUT}" "KILL_GRACE must be a positive duration"
 }
+
+test_ls_columns_align_with_long_ids() {
+  add_stub_job "Short" > /dev/null
+  add_stub_job "A rather long job title that makes a long slug" > /dev/null
+  local PRIORITY_OFFSETS
+  PRIORITY_OFFSETS="$(headrun ls | awk 'NR > 2 { print index($0, " 50  ") }' | sort -u)"
+  assert_equals 1 "$(printf '%s\n' "${PRIORITY_OFFSETS}" | wc -l)" "distinct PRI column offsets"
+}
