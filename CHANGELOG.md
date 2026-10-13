@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-10-13
+
+### Added
+
+- Documentation: README with one-line installer and quick start; `docs/jobsheets.md`,
+  `docs/engines.md`, `docs/operations.md`, `docs/security.md`.
+- Example jobsheets: WordPress plugin milestone, log analysis, stub, shell report.
+
+### Fixed
+
+- Jobs queued within the same second now run strictly first-in, first-out
+  (nanosecond `queued_order`), rather than alphabetically by ID.
+
 ## [0.4.0] - 2026-10-13
 
 ### Changed

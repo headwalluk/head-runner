@@ -102,3 +102,10 @@ test_prune_archives_then_deletes_old_jobs() {
   headrun prune --older-than 1d --delete > /dev/null 2>&1
   assert_equals "" "$(job_state_of "${OLD_ID}")"
 }
+
+test_same_second_jobs_run_fifo() {
+  local ZULU_ID ALPHA_ID
+  ZULU_ID="$(add_stub_job "Zulu")"
+  ALPHA_ID="$(add_stub_job "Alpha")"
+  assert_equals "${ZULU_ID} ${ALPHA_ID}" "$(headrun ls -q --state pending | tr '\n' ' ' | sed 's/ $//')"
+}

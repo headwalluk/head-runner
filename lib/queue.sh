@@ -329,6 +329,7 @@ queue_enqueue_locked() {
   mv "${DRAFT_FILE}" "${INCOMING_DIR}/request.md"
   meta_set "${INCOMING_DIR}" title "${JOB_TITLE}"
   meta_set "${INCOMING_DIR}" queued_at "$(now_epoch)"
+  meta_set "${INCOMING_DIR}" queued_order "$(date +%s%N)"
   if [[ -n "${REQUEUED_FROM}" ]]; then
     meta_set "${INCOMING_DIR}" requeued_from "${REQUEUED_FROM}"
   fi
@@ -346,11 +347,16 @@ job_priority() {
   printf '%s' "$(( 10#${JOB_PRIORITY} ))"
 }
 
-# Prints pending job ids in run order: priority ascending, then oldest first.
+# Prints pending job ids in run order: priority ascending, then oldest first (nanosecond queue order).
 queue_pending_in_order() {
   local STATE_NAME JOB_ID
   while IFS=$'\t' read -r STATE_NAME JOB_ID; do
     local JOB_DIR="${JOBS_ROOT}/${STATE_NAME}/${JOB_ID}"
-    printf '%03d\t%s\t%s\n' "$(job_priority "${JOB_DIR}")" "$(meta_get "${JOB_DIR}" queued_at 0)" "${JOB_ID}"
+    local QUEUED_ORDER
+    QUEUED_ORDER="$(meta_get "${JOB_DIR}" queued_order)"
+    if [[ -z "${QUEUED_ORDER}" ]]; then
+      QUEUED_ORDER="$(meta_get "${JOB_DIR}" queued_at 0)000000000"
+    fi
+    printf '%03d\t%s\t%s\n' "$(job_priority "${JOB_DIR}")" "${QUEUED_ORDER}" "${JOB_ID}"
   done < <(queue_list_jobs pending) | sort -t $'\t' -k1,1n -k2,2n -k3,3 | cut -f3
 }
