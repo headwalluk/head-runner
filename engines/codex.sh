@@ -27,9 +27,15 @@ CODEX_ARGUMENTS=(exec --cd "${HEADRUN_WORKDIR}" --skip-git-repo-check --output-l
 if [[ -n "${HEADRUN_MODEL}" ]]; then
   CODEX_ARGUMENTS+=(--model "${HEADRUN_MODEL}")
 fi
+# Newer releases replaced --full-auto with --approve-for-me (approvals reviewed automatically).
+CODEX_AUTO_FLAG="--full-auto"
+if "${CODEX_COMMAND}" exec --help 2>&1 | grep -q -e '--approve-for-me'; then
+  CODEX_AUTO_FLAG="--approve-for-me"
+fi
 case "${HEADRUN_PERMISSIONS}" in
   bypass) CODEX_ARGUMENTS+=(--dangerously-bypass-approvals-and-sandbox) ;;
-  auto|edits) CODEX_ARGUMENTS+=(--full-auto) ;;
+  auto) CODEX_ARGUMENTS+=("${CODEX_AUTO_FLAG}") ;;
+  edits) CODEX_ARGUMENTS+=(--sandbox workspace-write) ;;
   readonly) CODEX_ARGUMENTS+=(--sandbox read-only) ;;
   *)
     printf 'codex: unsupported permissions mode %s\n' "${HEADRUN_PERMISSIONS}" >&2
@@ -46,8 +52,19 @@ if [[ -n "${HEADRUN_DIRS}" ]]; then
 fi
 
 printf 'codex: %s %s - < prompt.md\n' "${CODEX_COMMAND}" "${CODEX_ARGUMENTS[*]}"
-CODEX_STATUS=0
-"${CODEX_COMMAND}" "${CODEX_ARGUMENTS[@]}" - < "${HEADRUN_PROMPT}" || CODEX_STATUS=$?
+OUTPUT_FILE="${HEADRUN_JOB_DIR}/codex-output.log"
+set +o errexit
+"${CODEX_COMMAND}" "${CODEX_ARGUMENTS[@]}" - < "${HEADRUN_PROMPT}" 2>&1 | tee "${OUTPUT_FILE}"
+PIPELINE_STATUSES=("${PIPESTATUS[@]}")
+set -o errexit
+CODEX_STATUS="${PIPELINE_STATUSES[0]}"
+
+# Codex prints its version, "session id: ..." in the header, and the token count on the line after "tokens used".
+{
+  sed -n 's/^OpenAI Codex \(v[^ ]*\).*/engine_version=codex \1/p' "${OUTPUT_FILE}" | sed -n 1p
+  sed -n 's/^session id: *\([^ ]*\).*/session_id=\1/p' "${OUTPUT_FILE}" | sed -n 1p
+  sed -n '/^tokens used$/{n;s/^\([0-9,]*\)$/engine_note=tokens used \1/p;}' "${OUTPUT_FILE}" | tail -n 1
+} >> "${HEADRUN_ENGINE_META}"
 
 if [[ ! -s "${HEADRUN_RESPONSE}" && -s "${LAST_MESSAGE_FILE}" ]]; then
   cp "${LAST_MESSAGE_FILE}" "${HEADRUN_RESPONSE}"

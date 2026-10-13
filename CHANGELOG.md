@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-10-13
+
+### Changed
+
+- Codex: `edits` maps to `--sandbox workspace-write`, and `auto` to `--approve-for-me`.
+  Codex 0.162 removed `--full-auto`, which older releases still get for `auto`. The
+  session ID, token count and Codex version are now recorded.
+
+### Added
+
+- Example `examples/codex-hello-world.md`: a C "hello world" with a hand-written Makefile.
+
+### Verified
+
+- Codex 0.162.1 live in `edits` mode: the hello-world job built and passed all five of its
+  checks, and the response, session ID and token count were recorded.
+
 ## [0.9.0] - 2026-10-13
 
 ### Added
