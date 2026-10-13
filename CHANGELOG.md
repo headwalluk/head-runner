@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-10-13
+
+### Fixed
+
+- `headrun doctor` no longer labels the `codex` adapter "untested" (verified in 0.10.0).
+
 ## [0.11.0] - 2026-10-13
 
 ### Fixed
